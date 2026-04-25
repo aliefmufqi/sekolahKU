@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, useCallback } from "react";
-import logoImg from "./logo.png";
+
 // ============================================================
 // API & AUTH CONTEXT
 // ============================================================
@@ -118,16 +118,7 @@ function Navbar({ page, setPage, auth }) {
     <nav style={{ background: COLORS.primary, position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 20px rgba(0,0,0,0.2)" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 64 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => setPage("home")}>
-          <img
-            src="src={logoImg}" // ganti dengan path logo kamu
-            alt="Logo Sekolah"
-            style={{
-            width: 40,
-            height: 40,
-            borderRadius: "50%", // kalau mau tetap bulat
-            objectFit: "cover"
-  }}
-/>
+
           <div>
             <div style={{ color: "white", fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>SEKOLAH KU JAYA</div>
             <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>Sistem Informasi Sekolah</div>
