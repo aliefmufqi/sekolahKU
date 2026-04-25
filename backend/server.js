@@ -32,7 +32,19 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'jalavadya_secret_fallback';
 
-app.use(cors());
+app.use(cors({
+  origin: function (origin, callback) {
+    // Izinkan request tanpa origin (curl, mobile, dll)
+    if (!origin) return callback(null, true);
+    const allowed = [
+      /\.vercel\.app$/,
+      /^http:\/\/localhost/,
+    ];
+    const isAllowed = allowed.some(p => p.test(origin));
+    callback(null, isAllowed ? true : new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
@@ -40,12 +52,13 @@ if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 // ========== KONEKSI MYSQL ==========
 const pool = mysql.createPool({
   host:     process.env.DB_HOST     || 'localhost',
-  port:     process.env.DB_PORT     || 3306,
+  port:     parseInt(process.env.DB_PORT) || 3306,
   user:     process.env.DB_USER     || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME     || 'jalavadya_db',
   waitForConnections: true,
   connectionLimit: 10,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
 // Test koneksi saat server start
@@ -217,9 +230,12 @@ app.get('/api/kurikulum', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/kurikulum', authMiddleware, async (req, res) => {
+app.post('/api/kurikulum', authMiddleware, upload.single('file'), async (req, res) => {
   try {
-    const { namaDokumen, deskripsi, file, tahun } = req.body;
+    const namaDokumen = req.body.namaDokumen;
+    const deskripsi   = req.body.deskripsi;
+    const tahun       = req.body.tahun;
+    const file        = req.file ? req.file.filename : req.body.file;
     const [result] = await pool.query(
       'INSERT INTO kurikulum (nama_dokumen, deskripsi, file, tahun) VALUES (?, ?, ?, ?)',
       [namaDokumen, deskripsi, file, tahun]

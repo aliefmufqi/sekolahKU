@@ -3,7 +3,8 @@ import { useState, useEffect, createContext, useContext, useCallback } from "rea
 // ============================================================
 // API & AUTH CONTEXT
 // ============================================================
-const API = "http://localhost:3001/api";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = `${BASE_URL}/api`;
 const AuthContext = createContext(null);
 
 function useAuth() { return useContext(AuthContext); }
@@ -313,7 +314,7 @@ function KurikulumPage() {
                 <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 4 }}>{item.deskripsi} • {item.tahun}</div>
               </div>
             </div>
-            <button className="btn btn-primary btn-sm"><Icon name="download" size={14} /> Unduh</button>
+            <a href={item.file ? `${BASE_URL}/uploads/${item.file}` : "#"} target="_blank" rel="noopener noreferrer" download className="btn btn-primary btn-sm" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="download" size={14} /> Unduh</a>
           </div>
         ))}
       </div>
@@ -382,22 +383,27 @@ function MediaPage() {
       <h1 className="section-title">Galeri Sekolah</h1>
       <p className="section-subtitle">Foto dan dokumentasi kegiatan SMA Jalavadya</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
-        {data.map(item => (
+        {data.map(item => {
+          const imgSrc = item.url && item.url.startsWith("http") ? item.url : `${BASE_URL}${item.url}`;
+          return (
           <div key={item.id} className="card" style={{ overflow: "hidden", cursor: "pointer" }} onClick={() => setSelected(item)}>
             <div style={{ height: 200, overflow: "hidden" }}>
-              <img src={item.url} alt={item.keterangan} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.3s" }} onMouseOver={e => e.target.style.transform = "scale(1.05)"} onMouseOut={e => e.target.style.transform = "scale(1)"} onError={e => { e.target.src = `https://picsum.photos/seed/${item.id}/600/400`; }} />
+              <img src={imgSrc} alt={item.keterangan} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.3s" }} onMouseOver={e => e.target.style.transform = "scale(1.05)"} onMouseOut={e => e.target.style.transform = "scale(1)"} onError={e => { e.target.style.display = "none"; e.target.parentElement.style.background = "#eef2f7"; }} />
             </div>
             <div style={{ padding: 16 }}>
               <p style={{ fontSize: 14, color: COLORS.text, fontWeight: 500 }}>{item.keterangan}</p>
               <p style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>{item.tanggal}</p>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
-      {selected && (
+      {selected && (() => {
+        const selSrc = selected.url && selected.url.startsWith("http") ? selected.url : `${BASE_URL}${selected.url}`;
+        return (
         <div className="modal-overlay" onClick={() => setSelected(null)}>
           <div style={{ maxWidth: 700, width: "100%", borderRadius: 20, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
-            <img src={selected.url} alt={selected.keterangan} style={{ width: "100%", maxHeight: 500, objectFit: "cover" }} onError={e => { e.target.src = `https://picsum.photos/seed/${selected.id}/700/500`; }} />
+            <img src={selSrc} alt={selected.keterangan} style={{ width: "100%", maxHeight: 500, objectFit: "cover" }} />
             <div style={{ background: "white", padding: 24 }}>
               <h3 style={{ fontSize: 18, fontWeight: 600 }}>{selected.keterangan}</h3>
               <p style={{ color: COLORS.muted, marginTop: 4 }}>{selected.tanggal}</p>
@@ -405,7 +411,8 @@ function MediaPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -559,7 +566,6 @@ function AdminPage({ auth, setPage }) {
     { id: "media", label: "Media", icon: "image" },
     { id: "statistik", label: "Statistik", icon: "chart" },
     { id: "kontak", label: "Pesan", icon: "mail" },
-    { id: "tema", label: "Tema", icon: "settings" },
     { id: "laporan", label: "Laporan", icon: "download" },
   ];
 
@@ -592,7 +598,6 @@ function AdminPage({ auth, setPage }) {
         {activeTab === "media" && <AdminMedia />}
         {activeTab === "statistik" && <AdminStatistik />}
         {activeTab === "kontak" && <AdminKontak />}
-        {activeTab === "tema" && <AdminTema />}
         {activeTab === "laporan" && <AdminLaporan />}
       </div>
     </div>
@@ -733,12 +738,28 @@ function AdminInformasi() {
 function AdminKurikulum() {
   const [data, setData] = useState([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ namaDokumen: "", deskripsi: "", tahun: "2024", file: "" });
+  const [form, setForm] = useState({ namaDokumen: "", deskripsi: "", tahun: "2024" });
+  const [pdfFile, setPdfFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const load = () => api("/kurikulum").then(setData);
   useEffect(() => { load(); }, []);
   const handleSave = async () => {
-    await api("/kurikulum", { method: "POST", body: JSON.stringify(form) });
-    load(); setModal(false); setForm({ namaDokumen: "", deskripsi: "", tahun: "2024", file: "" });
+    if (!pdfFile) { alert("Pilih file PDF terlebih dahulu"); return; }
+    setUploading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("file", pdfFile);
+      formData.append("namaDokumen", form.namaDokumen);
+      formData.append("deskripsi", form.deskripsi);
+      formData.append("tahun", form.tahun);
+      await fetch(`${API}/kurikulum`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      load(); setModal(false); setForm({ namaDokumen: "", deskripsi: "", tahun: "2024" }); setPdfFile(null);
+    } finally { setUploading(false); }
   };
   const handleDelete = async (id) => { if (confirm("Hapus?")) { await api(`/kurikulum/${id}`, { method: "DELETE" }); load(); } };
   return (
@@ -747,7 +768,7 @@ function AdminKurikulum() {
         { key: "namaDokumen", label: "Nama Dokumen" },
         { key: "deskripsi", label: "Deskripsi" },
         { key: "tahun", label: "Tahun" },
-      ]} onAdd={() => setModal(true)} onDelete={handleDelete} />
+      ]} onAdd={() => { setModal(true); setPdfFile(null); }} onDelete={handleDelete} />
       {modal && (
         <div className="modal-overlay">
           <div className="modal">
@@ -755,10 +776,14 @@ function AdminKurikulum() {
             <div className="form-group"><label>Nama Dokumen</label><input value={form.namaDokumen} onChange={e => setForm({ ...form, namaDokumen: e.target.value })} /></div>
             <div className="form-group"><label>Deskripsi</label><textarea value={form.deskripsi} onChange={e => setForm({ ...form, deskripsi: e.target.value })} rows={3} /></div>
             <div className="form-group"><label>Tahun</label><input value={form.tahun} onChange={e => setForm({ ...form, tahun: e.target.value })} /></div>
-            <div className="form-group"><label>Nama File</label><input value={form.file} onChange={e => setForm({ ...form, file: e.target.value })} placeholder="nama_file.pdf" /></div>
+            <div className="form-group">
+              <label>File PDF</label>
+              <input type="file" accept=".pdf,application/pdf" onChange={e => setPdfFile(e.target.files[0] || null)} style={{ padding: "6px 0" }} />
+              {pdfFile && <div style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✓ {pdfFile.name}</div>}
+            </div>
             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
               <button className="btn btn-outline" onClick={() => setModal(false)}>Batal</button>
-              <button className="btn btn-primary" onClick={handleSave}>Simpan</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={uploading}>{uploading ? "Mengunggah..." : "Simpan"}</button>
             </div>
           </div>
         </div>
@@ -820,32 +845,57 @@ function AdminPrestasi() {
 function AdminMedia() {
   const [data, setData] = useState([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ keterangan: "", url: "", tipe: "foto" });
+  const [form, setForm] = useState({ keterangan: "", tipe: "foto" });
+  const [imageFile, setImageFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const load = () => api("/media").then(setData);
   useEffect(() => { load(); }, []);
   const handleSave = async () => {
-    await api("/media", { method: "POST", body: JSON.stringify({ ...form, namaFile: form.keterangan.replace(/\s+/g, "_") }) });
-    load(); setModal(false); setForm({ keterangan: "", url: "", tipe: "foto" });
+    if (!imageFile) { alert("Pilih file gambar terlebih dahulu"); return; }
+    setUploading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("file", imageFile);
+      formData.append("keterangan", form.keterangan);
+      formData.append("tipe", form.tipe);
+      formData.append("namaFile", form.keterangan.replace(/\s+/g, "_"));
+      await fetch(`${API}/media`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      load(); setModal(false); setForm({ keterangan: "", tipe: "foto" }); setImageFile(null);
+    } finally { setUploading(false); }
   };
   const handleDelete = async (id) => { if (confirm("Hapus?")) { await api(`/media/${id}`, { method: "DELETE" }); load(); } };
   return (
     <>
       <AdminTable title="Kelola Media & Foto" data={data} columns={[
-        { key: "url", label: "Preview", render: (v) => <img src={v} style={{ width: 60, height: 45, objectFit: "cover", borderRadius: 6 }} onError={e => { e.target.src = "https://picsum.photos/60/45"; }} /> },
+        { key: "url", label: "Preview", render: (v) => { const src = v && v.startsWith("http") ? v : `${BASE_URL}${v}`; return <img src={src} style={{ width: 60, height: 45, objectFit: "cover", borderRadius: 6 }} onError={e => { e.target.style.display = "none"; }} />; } },
         { key: "keterangan", label: "Keterangan" },
         { key: "tipe", label: "Tipe" },
         { key: "tanggal", label: "Tanggal" },
-      ]} onAdd={() => setModal(true)} onDelete={handleDelete} />
+      ]} onAdd={() => { setModal(true); setImageFile(null); }} onDelete={handleDelete} />
       {modal && (
         <div className="modal-overlay">
           <div className="modal">
             <h3 style={{ fontWeight: 600, marginBottom: 24 }}>Tambah Media</h3>
             <div className="form-group"><label>Keterangan</label><input value={form.keterangan} onChange={e => setForm({ ...form, keterangan: e.target.value })} /></div>
-            <div className="form-group"><label>URL Gambar</label><input value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://..." /></div>
+            <div className="form-group">
+              <label>File Gambar</label>
+              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif" onChange={e => setImageFile(e.target.files[0] || null)} style={{ padding: "6px 0" }} />
+              {imageFile && (
+                <div style={{ marginTop: 8 }}>
+                  <img src={URL.createObjectURL(imageFile)} alt="preview" style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 6, border: "1px solid #ddd" }} />
+                  <div style={{ fontSize: 12, color: "#27ae60", marginTop: 4 }}>✓ {imageFile.name}</div>
+                </div>
+              )}
+            </div>
             <div className="form-group"><label>Tipe</label><select value={form.tipe} onChange={e => setForm({ ...form, tipe: e.target.value })}><option value="foto">Foto</option><option value="video">Video</option></select></div>
             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
               <button className="btn btn-outline" onClick={() => setModal(false)}>Batal</button>
-              <button className="btn btn-primary" onClick={handleSave}>Simpan</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={uploading}>{uploading ? "Mengunggah..." : "Simpan"}</button>
             </div>
           </div>
         </div>
