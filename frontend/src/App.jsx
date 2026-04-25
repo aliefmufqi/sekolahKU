@@ -162,7 +162,7 @@ function Navbar({ page, setPage, auth }) {
 // HOME PAGE
 // ============================================================
 function HomePage({ setPage }) {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({ jumlahSiswa: 0, jumlahGuru: 0, akreditasi: '-', lulusanDiterima: 0, jumlahKelas: 0, tahunBerdiri: '-' });
   const [informasi, setInformasi] = useState([]);
   const [prestasi, setPrestasi] = useState([]);
 
@@ -197,7 +197,7 @@ function HomePage({ setPage }) {
             {stats && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 {[
-                  { label: "Siswa Aktif", value: stats.jumlahSiswa.toLocaleString(), icon: "user", color: "#3498db" },
+                  { label: "Siswa Aktif", value: (stats.jumlahSiswa || 0).toLocaleString(), icon: "user", color: "#3498db" },
                   { label: "Tenaga Pengajar", value: stats.jumlahGuru, icon: "book", color: "#27ae60" },
                   { label: "Akreditasi", value: stats.akreditasi, icon: "star", color: COLORS.accent },
                   { label: "Lulusan Diterima PTN", value: `${stats.lulusanDiterima}%`, icon: "trophy", color: "#e74c3c" },
@@ -606,7 +606,7 @@ function AdminPage({ auth, setPage }) {
 
 // ---- ADMIN DASHBOARD ----
 function AdminDashboard() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({ jumlahSiswa: 0, jumlahGuru: 0, akreditasi: '-', lulusanDiterima: 0, jumlahKelas: 0, tahunBerdiri: '-' });
   const [counts, setCounts] = useState({});
   useEffect(() => {
     api("/statistik").then(setStats);
